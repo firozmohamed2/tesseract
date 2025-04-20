@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Malayalam + English OCR</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+      }
+      input,
+      button {
+        margin: 10px 0;
+      }
+      img {
+        max-width: 100%;
+        margin-top: 10px;
+      }
+      #output {
+        white-space: pre-wrap;
+        margin-top: 20px;
+        background: #f0f0f0;
+        padding: 10px;
+        border-radius: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>OCR for Malayalam + English</h2>
+
+    <input type="file" id="imageUploader" accept="image/*" />
+    <br />
+    <img id="preview" alt="Image Preview" />
+    <br />
+    <button onclick="performOCR()">Extract Text</button>
+
+    <h3>Output:</h3>
+    <div id="output"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.1/dist/tesseract.min.js"></script>
+    <script>
+      const imageUploader = document.getElementById("imageUploader");
+      const preview = document.getElementById("preview");
+      const output = document.getElementById("output");
+
+      let selectedImage = null;
+
+      imageUploader.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          preview.src = reader.result;
+          selectedImage = reader.result;
+        };
+        reader.readAsDataURL(file);
+      });
+
+      async function performOCR() {
+        if (!selectedImage) {
+          output.textContent = "Please upload an image.";
+          return;
+        }
+
+        output.textContent = "Reading text from image...";
+
+        try {
+          const result = await Tesseract.recognize(
+            selectedImage,
+            "mal+eng", // Malayalam + English
+            {
+              logger: (m) => console.log(m),
+            }
+          );
+          output.textContent = result.data.text;
+        } catch (err) {
+          console.error(err);
+          output.textContent = "Error during OCR: " + err.message;
+        }
+      }
+    </script>
+  </body>
+</html>

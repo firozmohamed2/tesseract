@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Full PDF OCR (Malayalam + English)</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+      }
+
+      .canvas-wrapper {
+        display: flex;
+        gap: 20px;
+        margin-bottom: 10px;
+      }
+
+      .column {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        flex: 1;
+      }
+
+      canvas {
+        border: 1px solid #ccc;
+        width: 100%;
+        max-width: 400px;
+      }
+
+      textarea {
+        width: 100%;
+        font-size: 14px;
+        padding: 10px;
+        border-radius: 6px;
+        border: 1px solid #ccc;
+      }
+
+      #controls {
+        margin-bottom: 10px;
+      }
+
+      button {
+        margin-left: 10px;
+        padding: 5px 10px;
+        font-size: 14px;
+        cursor: pointer;
+      }
+
+      #pageIndicator {
+        margin-top: 10px;
+        font-weight: bold;
+      }
+
+      .progress {
+        margin-top: 5px;
+        font-size: 14px;
+        color: #444;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Full PDF OCR with Malayalam + English</h2>
+
+    <input type="file" id="pdfUploader" accept="application/pdf" /><br /><br />
+
+    <div id="controls">
+      Start from Page:
+      <input
+        type="number"
+        id="startPageInput"
+        min="1"
+        value="1"
+        style="width: 60px"
+      />
+      <button onclick="startAutoOCR()">Start OCR from Page</button>
+      <button onclick="stopAutoOCR()">Stop</button>
+    </div>
+
+    <p id="pageIndicator">Page: 0</p>
+
+    <canvas id="mainCanvas" style="display: none"></canvas>
+
+    <div class="canvas-wrapper">
+      <div class="column">
+        <h4>Left Column</h4>
+        <canvas id="leftCanvas"></canvas>
+        <div class="progress" id="leftProgress">Left OCR Progress: 0%</div>
+      </div>
+      <div class="column">
+        <h4>Right Column</h4>
+        <canvas id="rightCanvas"></canvas>
+        <div class="progress" id="rightProgress">Right OCR Progress: 0%</div>
+      </div>
+    </div>
+
+    <h3>Extracted Text (All Pages)</h3>
+    <textarea
+      id="finalOutput"
+      rows="20"
+      placeholder="All extracted text will appear here..."
+    ></textarea>
+
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.1/dist/tesseract.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <script>
+      const pdfUploader = document.getElementById("pdfUploader");
+      const mainCanvas = document.getElementById("mainCanvas");
+      const mainCtx = mainCanvas.getContext("2d");
+      const leftCanvas = document.getElementById("leftCanvas");
+      const leftCtx = leftCanvas.getContext("2d");
+      const rightCanvas = document.getElementById("rightCanvas");
+      const rightCtx = rightCanvas.getContext("2d");
+      const finalOutput = document.getElementById("finalOutput");
+      const pageIndicator = document.getElementById("pageIndicator");
+      const leftProgress = document.getElementById("leftProgress");
+      const rightProgress = document.getElementById("rightProgress");
+
+      let pdf = null;
+      let totalPages = 0;
+      let currentPage = 1;
+      let stopRequested = false;
+
+      pdfUploader.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async function () {
+          const typedArray = new Uint8Array(this.result);
+          pdf = await pdfjsLib.getDocument({ data: typedArray }).promise;
+          totalPages = pdf.numPages;
+          alert("PDF Loaded. Total Pages: " + totalPages);
+        };
+        reader.readAsArrayBuffer(file);
+      });
+
+      function stopAutoOCR() {
+        stopRequested = true;
+      }
+
+      function startAutoOCR() {
+        stopRequested = false;
+        currentPage = parseInt(document.getElementById("startPageInput").value);
+        finalOutput.value = "";
+        iteratePages();
+      }
+
+      async function iteratePages() {
+        while (currentPage <= totalPages && !stopRequested) {
+          await renderPage(currentPage);
+          await performSplitOCR();
+          currentPage++;
+        }
+
+        if (stopRequested) {
+          alert("OCR Stopped.");
+        } else {
+          alert("OCR Completed.");
+        }
+      }
+
+      async function renderPage(pageNumber) {
+        if (!pdf || pageNumber < 1 || pageNumber > totalPages) return;
+
+        const page = await pdf.getPage(pageNumber);
+        const viewport = page.getViewport({ scale: 2 });
+
+        mainCanvas.width = viewport.width;
+        mainCanvas.height = viewport.height;
+
+        await page.render({ canvasContext: mainCtx, viewport }).promise;
+        pageIndicator.textContent = `Page: ${pageNumber}`;
+      }
+
+      async function performSplitOCR() {
+        const width = mainCanvas.width;
+        const height = mainCanvas.height;
+        const halfWidth = width / 2;
+
+        const leftImageData = mainCtx.getImageData(0, 0, halfWidth, height);
+        const rightImageData = mainCtx.getImageData(
+          halfWidth,
+          0,
+          halfWidth,
+          height
+        );
+
+        [leftCanvas, rightCanvas].forEach((canvas) => {
+          canvas.width = halfWidth;
+          canvas.height = height;
+        });
+
+        leftCtx.putImageData(leftImageData, 0, 0);
+        rightCtx.putImageData(rightImageData, 0, 0);
+
+        // Reset progress display
+        leftProgress.textContent = "Left OCR Progress: 0%";
+        rightProgress.textContent = "Right OCR Progress: 0%";
+
+        const leftPromise = Tesseract.recognize(leftCanvas, "mal+eng", {
+          logger: (m) => {
+            if (m.status === "recognizing text") {
+              leftProgress.textContent = `Left OCR Progress: ${(
+                m.progress * 100
+              ).toFixed(0)}%`;
+            }
+          },
+        });
+
+        const rightPromise = Tesseract.recognize(rightCanvas, "mal+eng", {
+          logger: (m) => {
+            if (m.status === "recognizing text") {
+              rightProgress.textContent = `Right OCR Progress: ${(
+                m.progress * 100
+              ).toFixed(0)}%`;
+            }
+          },
+        });
+
+        const [leftResult, rightResult] = await Promise.all([
+          leftPromise,
+          rightPromise,
+        ]);
+
+        const leftText = leftResult.data.text.trim();
+        const rightText = rightResult.data.text.trim();
+
+        finalOutput.value += `--- Page ${currentPage} ---\nLeft:\n${leftText}\n\nRight:\n${rightText}\n\n`;
+      }
+    </script>
+  </body>
+</html>

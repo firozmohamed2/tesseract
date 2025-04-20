@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>OCR with Bounding Boxes (Malayalam + English)</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+      }
+      .output {
+        white-space: pre-wrap;
+        background: #f0f0f0;
+        padding: 10px;
+        border-radius: 6px;
+        margin-top: 10px;
+      }
+      canvas {
+        border: 1px solid #ccc;
+        margin-right: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>OCR with Bounding Boxes</h2>
+
+    <input type="file" id="imageUploader" accept="image/*" /><br />
+    <canvas id="mainCanvas" style="display: none"></canvas>
+    <br />
+    <button onclick="performSplitOCR()">Read with Bounding Boxes</button>
+
+    <h3>Preview + Bounding Boxes:</h3>
+    <div style="display: flex; gap: 20px">
+      <div>
+        <h4>Left Column</h4>
+        <canvas id="leftCanvas"></canvas>
+        <div class="output" id="leftOutput"></div>
+      </div>
+      <div>
+        <h4>Right Column</h4>
+        <canvas id="rightCanvas"></canvas>
+        <div class="output" id="rightOutput"></div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.1/dist/tesseract.min.js"></script>
+    <script>
+      const uploader = document.getElementById("imageUploader");
+      const mainCanvas = document.getElementById("mainCanvas");
+      const mainCtx = mainCanvas.getContext("2d");
+
+      const leftCanvas = document.getElementById("leftCanvas");
+      const leftCtx = leftCanvas.getContext("2d");
+
+      const rightCanvas = document.getElementById("rightCanvas");
+      const rightCtx = rightCanvas.getContext("2d");
+
+      let image = new Image();
+
+      uploader.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          image.onload = () => {
+            mainCanvas.width = image.width;
+            mainCanvas.height = image.height;
+            mainCtx.drawImage(image, 0, 0);
+          };
+          image.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+      });
+
+      async function performSplitOCR() {
+        const width = mainCanvas.width;
+        const height = mainCanvas.height;
+
+        if (width === 0 || height === 0) {
+          alert("Upload an image first!");
+          return;
+        }
+
+        const halfWidth = width / 2;
+
+        // Get left and right halves
+        const leftImageData = mainCtx.getImageData(0, 0, halfWidth, height);
+        const rightImageData = mainCtx.getImageData(
+          halfWidth,
+          0,
+          halfWidth,
+          height
+        );
+
+        // Prepare canvases
+        [leftCanvas, rightCanvas].forEach((canvas) => {
+          canvas.width = halfWidth;
+          canvas.height = height;
+        });
+
+        leftCtx.putImageData(leftImageData, 0, 0);
+        rightCtx.putImageData(rightImageData, 0, 0);
+
+        document.getElementById("leftOutput").textContent =
+          "Reading left column...";
+        document.getElementById("rightOutput").textContent =
+          "Reading right column...";
+
+        const leftPromise = Tesseract.recognize(leftCanvas, "mal+eng");
+        const rightPromise = Tesseract.recognize(rightCanvas, "mal+eng");
+
+        const [leftResult, rightResult] = await Promise.all([
+          leftPromise,
+          rightPromise,
+        ]);
+
+        // Draw bounding boxes
+        drawBoundingBoxes(leftCtx, leftResult.data.words);
+        drawBoundingBoxes(rightCtx, rightResult.data.words);
+
+        document.getElementById("leftOutput").textContent =
+          leftResult.data.text.trim();
+        document.getElementById("rightOutput").textContent =
+          rightResult.data.text.trim();
+      }
+
+      function drawBoundingBoxes(ctx, words) {
+        ctx.strokeStyle = "red";
+        ctx.lineWidth = 1.5;
+        ctx.font = "10px Arial";
+        ctx.fillStyle = "rgba(255,0,0,0.3)";
+        words.forEach((word) => {
+          const { x0, y0, x1, y1 } = word.bbox;
+          const w = x1 - x0;
+          const h = y1 - y0;
+          ctx.fillRect(x0, y0, w, h); // highlight
+          ctx.strokeRect(x0, y0, w, h); // border
+          ctx.fillStyle = "red";
+          ctx.fillText(word.text, x0, y0 - 2); // optional label
+          ctx.fillStyle = "rgba(255,0,0,0.3)";
+        });
+      }
+    </script>
+  </body>
+</html>
