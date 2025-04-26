@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ml">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Malayalam Question Parser</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        padding: 20px;
+        max-width: 1000px;
+        margin: auto;
+      }
+      textarea {
+        width: 100%;
+        height: 200px;
+        font-size: 16px;
+      }
+      button {
+        margin-top: 10px;
+        padding: 10px 15px;
+        font-size: 16px;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        margin-top: 20px;
+      }
+      th,
+      td {
+        border: 1px solid #ccc;
+        padding: 10px;
+        vertical-align: top;
+      }
+      th {
+        background-color: #f2f2f2;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Malayalam Question Parser to Table</h2>
+    <textarea
+      id="inputText"
+      placeholder="Paste your questions here..."
+    ></textarea>
+    <br />
+    <button onclick="parseQuestions()">Parse</button>
+    <button onclick="downloadCSV()">Download as CSV</button>
+    <div id="output"></div>
+
+    <script>
+      function parseQuestions() {
+        const input = document.getElementById("inputText").value.trim();
+        const blocks = input.split(/\n\s*\n/); // Split by double line breaks
+        let html =
+          "<table><tr><th>Question</th><th>A</th><th>B</th><th>C</th><th>D</th></tr>";
+
+        for (let block of blocks) {
+          const lines = block.trim().split("\n").filter(Boolean);
+          if (lines.length === 0) continue;
+
+          let questionLine = lines[0];
+          let aLine = "";
+          let restLines = [];
+
+          // Check if A) is in question line itself
+          if (questionLine.includes("A)")) {
+            const [q, a] = questionLine.split(/A\)/);
+            questionLine = q.trim();
+            aLine = a.trim();
+            restLines = lines.slice(1);
+          } else {
+            aLine = lines[1] ? lines[1].replace(/^A\)\s*/, "").trim() : "";
+            restLines = lines.slice(2);
+          }
+
+          const question = questionLine;
+          const a = aLine;
+          const b = restLines[0]
+            ? restLines[0].replace(/^B\)\s*/, "").trim()
+            : "";
+          const c = restLines[1]
+            ? restLines[1].replace(/^C\)\s*/, "").trim()
+            : "";
+          const d = restLines[2]
+            ? restLines[2].replace(/^D\)\s*/, "").trim()
+            : "";
+
+          html += `<tr>
+          <td>${question}</td>
+          <td>${a}</td>
+          <td>${b}</td>
+          <td>${c}</td>
+          <td>${d}</td>
+        </tr>`;
+        }
+
+        html += "</table>";
+        document.getElementById("output").innerHTML = html;
+      }
+
+      function downloadCSV() {
+        const rows = [["Question", "A", "B", "C", "D"]];
+        const table = document.querySelector("table");
+        if (!table) return alert("No table to export!");
+
+        for (let tr of table.querySelectorAll("tr:nth-child(n+2)")) {
+          const cells = Array.from(tr.querySelectorAll("td")).map(
+            (td) => `"${td.textContent.trim()}"`
+          );
+          rows.push(cells);
+        }
+
+        const csvContent = rows.map((r) => r.join(",")).join("\n");
+        const blob = new Blob([csvContent], {
+          type: "text/csv;charset=utf-8;",
+        });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "questions.csv";
+        link.click();
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Gradient Text to PNG</title>
+    <!-- Google Fonts for Malayalam + Latin -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+Malayalam:wght@700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        background: #f0f0f0;
+        margin: 0;
+      }
+
+      canvas {
+        border: 1px dashed #ccc;
+      }
+
+      button {
+        margin-top: 20px;
+        padding: 10px 20px;
+        font-size: 16px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="textCanvas" width="1200" height="600"></canvas>
+    <button onclick="downloadImage()">Download as PNG</button>
+
+    <script>
+      const canvas = document.getElementById("textCanvas");
+      const ctx = canvas.getContext("2d");
+
+      // Clear with transparent background
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Set font with fallback for Malayalam + Latin
+      ctx.font = "bold 60px 'Noto Sans Malayalam', sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+
+      // Create gradient (horizontal)
+      const gradient = ctx.createLinearGradient(200, 0, 1000, 0);
+      gradient.addColorStop(0, "#eeba2b");
+      gradient.addColorStop(0.5, "#ffd28f");
+      gradient.addColorStop(1, "#eeba2b");
+
+      ctx.fillStyle = gradient;
+
+      // Malayalam + Latin multi-line text
+      const lines = [
+        "ക്ലാസ് 5-7, സ്റ്റേറ്റ്, CBSE",
+        "+1 , +2 സ്റ്റേറ്റ്, CBSE",
+      ];
+
+      lines.forEach((line, index) => {
+        ctx.fillText(line, canvas.width / 2, 250 + index * 100);
+      });
+
+      function downloadImage() {
+        const link = document.createElement("a");
+        link.download = "gradient-text.png";
+        link.href = canvas.toDataURL("image/png");
+        link.click();
+      }
+    </script>
+  </body>
+</html>

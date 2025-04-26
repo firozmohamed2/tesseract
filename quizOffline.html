@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ml">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Live Kerala History Quiz</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        background: #f8f9fa;
+        padding: 0;
+        margin: 0;
+      }
+      .header {
+        position: sticky;
+        top: 0;
+        background: #007bff;
+        color: white;
+        padding: 15px;
+        font-size: 20px;
+        font-weight: bold;
+        text-align: center;
+        z-index: 1000;
+      }
+      .container {
+        padding: 20px;
+        padding-top: 80px; /* leave space for fixed header */
+        max-width: 900px;
+        margin: auto;
+      }
+      textarea {
+        width: 100%;
+        height: 200px;
+        margin-bottom: 10px;
+        font-family: monospace;
+        font-size: 14px;
+      }
+      button {
+        padding: 10px 15px;
+        font-size: 16px;
+        margin: 10px 0;
+        cursor: pointer;
+      }
+      .quiz-box {
+        background: #fff;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        margin-top: 20px;
+      }
+      .question {
+        font-weight: bold;
+        margin: 20px 0 10px;
+      }
+      .option {
+        margin: 5px 0;
+        cursor: pointer;
+      }
+      .correct {
+        color: green;
+        font-weight: bold;
+        animation: pop 0.4s ease;
+      }
+      .wrong {
+        color: red;
+        font-weight: bold;
+      }
+      .warning {
+        color: orange;
+        font-weight: bold;
+        margin-top: 10px;
+      }
+      input[type="radio"] {
+        transform: scale(1.3);
+        margin-right: 8px;
+        cursor: pointer;
+      }
+      @keyframes pop {
+        0% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.3);
+        }
+        100% {
+          transform: scale(1);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header" id="result">നിങ്ങളുടെ സ്കോർ: 0/0</div>
+
+    <div class="container">
+      <h2>Enter Raw Quiz Data Below:</h2>
+      <textarea id="rawInput">
+// Example input:
+കേരള ചരിത്രത്തില്‍ പറങ്കികള്‍ എന്നറിയപ്പെടുന്ന യൂറോപ്യന്‍ ശക്തികൾ?	പോര്‍ട്ടുഗീസുകാര്‍	B) ഡച്ചുകാര്‍	C) ഫ്രഞ്ചുകാര്‍	D) ഇംഗ്ലീഷുകാര്‍	a
+ആഫ്രിക്കന്‍ ഭൂഖണ്ഡത്തിന്റെ തെക്കേ അറ്റമായ ശുഭ പ്രതീക്ഷാ മുനമ്പ് ചുറ്റി ഏഷ്യയിലേക്ക്‌ വരുന്നതിനുള്ള കപ്പല്‍ മാര്‍ഗ്ഗം കണ്ടെത്തിയ പോര്‍ച്ചുഗീസ്‌ നാവികന്‍?	വാസ്‌കോഡ ഗാമ	B) ബാര്‍ത്തലോമിയ ഡയസ്‌	C) കരബാള്‍	D) അല്‍ബുക്കര്‍ക്ക്‌	b
+...
+  </textarea
+      >
+      <button onclick="generateQuiz()">Generate Quiz</button>
+
+      <div class="warning" id="warning"></div>
+
+      <div class="quiz-box" id="quizBox"></div>
+    </div>
+
+    <script>
+      let quiz = [];
+      let invalidCount = 0;
+      let invalidLines = [];
+      let answered = {};
+
+      function shuffleArray(array) {
+        return array
+          .map((value) => ({ value, sort: Math.random() }))
+          .sort((a, b) => a.sort - b.sort)
+          .map(({ value }) => value);
+      }
+
+      function parseQuizData(raw) {
+        const lines = raw.trim().split("\n");
+        invalidCount = 0;
+        invalidLines = [];
+
+        return lines
+          .map((line) => line.trim())
+          .filter((line) => line.length > 0)
+          .map((line, idx) => {
+            const parts = line.split("\t");
+            if (parts.length < 6) {
+              invalidCount++;
+              invalidLines.push(idx + 1);
+              return null;
+            }
+            const options = [
+              { key: "a", text: parts[1] },
+              { key: "b", text: parts[2] },
+              { key: "c", text: parts[3] },
+              { key: "d", text: parts[4] },
+            ];
+            return {
+              question: parts[0],
+              options: shuffleArray(options),
+              answer: parts[5].toLowerCase().trim(),
+            };
+          })
+          .filter((q) => q !== null);
+      }
+
+      function generateQuiz() {
+        const raw = document.getElementById("rawInput").value;
+        quiz = parseQuizData(raw);
+        answered = {};
+
+        const quizBox = document.getElementById("quizBox");
+        quizBox.innerHTML = quiz
+          .map(
+            (q, index) => `
+    <div id="question${index}">
+      <div class="question">${index + 1}. ${q.question}</div>
+      <div class="options" id="options${index}">
+        ${q.options
+          .map(
+            (opt) => `
+          <div class="option">
+            <label>
+              <input type="radio" name="question${index}" value="${opt.key}" onclick="checkAnswer(${index}, '${opt.key}', this)">
+              ${opt.text}
+            </label>
+          </div>
+        `
+          )
+          .join("")}
+      </div>
+    </div>
+  `
+          )
+          .join("");
+
+        updateResult();
+        const warning = document.getElementById("warning");
+        if (invalidCount > 0) {
+          warning.innerHTML = `⚠️ ശ്രദ്ധിക്കുക: ${invalidCount} പിഴവുള്ള ലൈനുകൾ സ്കിപ്പ് ചെയ്തിരിക്കുന്നു.<br>Skipped Lines: ${invalidLines.join(
+            ", "
+          )}`;
+        } else {
+          warning.textContent = "";
+        }
+      }
+
+      function checkAnswer(index, selectedValue, element) {
+        const correctAnswer = quiz[index].answer;
+        if (answered[index]) return;
+
+        if (selectedValue === correctAnswer) {
+          element.parentElement.classList.add("correct");
+        } else {
+          element.parentElement.classList.add("wrong");
+
+          const correctInput = document.querySelector(
+            `input[name="question${index}"][value="${correctAnswer}"]`
+          );
+          if (correctInput) {
+            correctInput.parentElement.classList.add("correct");
+          }
+        }
+
+        document
+          .querySelectorAll(`input[name="question${index}"]`)
+          .forEach((inp) => (inp.disabled = true));
+        answered[index] = selectedValue === correctAnswer;
+
+        updateResult();
+        scrollToNext(index);
+      }
+
+      function updateResult() {
+        const total = quiz.length;
+        const correct = Object.values(answered).filter(
+          (v) => v === true
+        ).length;
+        document.getElementById(
+          "result"
+        ).textContent = `നിങ്ങളുടെ സ്കോർ: ${correct}/${total}`;
+      }
+
+      function scrollToNext(currentIndex) {
+        const nextElement = document.getElementById(
+          `question${currentIndex + 1}`
+        );
+        if (nextElement) {
+          nextElement.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }
+    </script>
+  </body>
+</html>

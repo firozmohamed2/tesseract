@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="ml">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Live Kerala History Quiz (Online)</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        background: #f8f9fa;
+        margin: 0;
+        padding: 0;
+      }
+      .header {
+        position: sticky;
+        top: 0;
+        background: #007bff;
+        color: white;
+        padding: 15px;
+        font-size: 20px;
+        font-weight: bold;
+        text-align: center;
+        z-index: 1000;
+      }
+      .container {
+        padding: 20px;
+        padding-top: 80px;
+        max-width: 900px;
+        margin: auto;
+      }
+      textarea {
+        width: 100%;
+        height: 200px;
+        margin-bottom: 10px;
+        font-family: monospace;
+        font-size: 14px;
+      }
+      input[type="text"] {
+        width: 100%;
+        padding: 8px;
+        margin-bottom: 10px;
+        font-size: 16px;
+      }
+      button {
+        padding: 10px 15px;
+        font-size: 16px;
+        margin: 5px 0;
+        cursor: pointer;
+      }
+      .quiz-box {
+        background: #fff;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        margin-top: 20px;
+      }
+      .question {
+        font-weight: bold;
+        margin: 20px 0 10px;
+      }
+      .option {
+        margin: 5px 0;
+        cursor: pointer;
+      }
+      .correct {
+        color: green;
+        font-weight: bold;
+        animation: pop 0.4s ease;
+      }
+      .wrong {
+        color: red;
+        font-weight: bold;
+      }
+      .warning {
+        color: orange;
+        font-weight: bold;
+        margin-top: 10px;
+      }
+      input[type="radio"] {
+        transform: scale(1.3);
+        margin-right: 8px;
+        cursor: pointer;
+      }
+      .topics {
+        margin: 20px 0;
+      }
+      .topic-button {
+        display: inline-block;
+        padding: 8px 12px;
+        margin: 5px;
+        background: #28a745;
+        color: white;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      @keyframes pop {
+        0% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.3);
+        }
+        100% {
+          transform: scale(1);
+        }
+      }
+    </style>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  </head>
+
+  <body>
+    <div class="header" id="result">നിങ്ങളുടെ സ്കോർ: 0/0</div>
+
+    <div class="container">
+      <h2>Enter New Quiz</h2>
+      <input
+        type="text"
+        id="topicName"
+        placeholder="Enter Topic Name (Eg: Kerala History)"
+      />
+      <textarea
+        id="rawInput"
+        placeholder="Paste your quiz data here..."
+      ></textarea>
+      <button onclick="saveQuiz()">Save Quiz to Firebase</button>
+
+      <div class="warning" id="warning"></div>
+
+      <h2>Available Topics:</h2>
+      <div id="topics" class="topics"></div>
+
+      <div class="quiz-box" id="quizBox"></div>
+    </div>
+
+    <script>
+      // Initialize Firebase
+      const firebaseConfig = {
+        apiKey: "AIzaSyA88fPkOvcI4QA9qD3ROpk-ay-V6ibQQlc",
+        authDomain: "my-application-7fd40.firebaseapp.com",
+        projectId: "my-application-7fd40",
+        storageBucket: "my-application-7fd40.appspot.com",
+        messagingSenderId: "269589994279",
+        appId: "1:269589994279:web:4c617a622c328a1224e702",
+        measurementId: "G-D8MD1J28GR",
+      };
+      firebase.initializeApp(firebaseConfig);
+      const db = firebase.firestore();
+
+      let quiz = [];
+      let answered = {};
+      let invalidCount = 0;
+      let invalidLines = [];
+
+      function shuffleArray(array) {
+        return array
+          .map((value) => ({ value, sort: Math.random() }))
+          .sort((a, b) => a.sort - b.sort)
+          .map(({ value }) => value);
+      }
+
+      function parseQuizData(raw) {
+        const lines = raw.trim().split("\n");
+        invalidCount = 0;
+        invalidLines = [];
+
+        return lines
+          .map((line) => line.trim())
+          .filter((line) => line.length > 0)
+          .map((line, idx) => {
+            const parts = line.split("\t");
+            if (parts.length < 6) {
+              invalidCount++;
+              invalidLines.push(idx + 1);
+              return null;
+            }
+            const options = [
+              { key: "a", text: parts[1] },
+              { key: "b", text: parts[2] },
+              { key: "c", text: parts[3] },
+              { key: "d", text: parts[4] },
+            ];
+            return {
+              question: parts[0],
+              options: shuffleArray(options),
+              answer: parts[5].toLowerCase().trim(),
+            };
+          })
+          .filter((q) => q !== null);
+      }
+
+      function saveQuiz() {
+        const topic = document.getElementById("topicName").value.trim();
+        const raw = document.getElementById("rawInput").value.trim();
+        if (!topic || !raw) {
+          alert("Please enter both Topic Name and Quiz Data!");
+          return;
+        }
+        const parsedQuiz = parseQuizData(raw);
+
+        db.collection("quiz")
+          .doc(topic)
+          .set({ questions: parsedQuiz })
+          .then(() => {
+            alert("Quiz Saved Successfully!");
+            loadTopics();
+          })
+          .catch((err) => {
+            alert("Error saving quiz: " + err.message);
+          });
+      }
+
+      function loadTopics() {
+        db.collection("quiz")
+          .get()
+          .then((snapshot) => {
+            const topicsDiv = document.getElementById("topics");
+            topicsDiv.innerHTML = "";
+            snapshot.forEach((doc) => {
+              const topicName = doc.id;
+              const btn = document.createElement("div");
+              btn.className = "topic-button";
+              btn.innerText = topicName;
+              btn.onclick = () => loadQuiz(topicName);
+              topicsDiv.appendChild(btn);
+            });
+          });
+      }
+
+      function loadQuiz(topic) {
+        db.collection("quiz")
+          .doc(topic)
+          .get()
+          .then((doc) => {
+            if (doc.exists) {
+              quiz = doc.data().questions;
+              answered = {};
+              displayQuiz();
+            }
+          });
+      }
+
+      function displayQuiz() {
+        const quizBox = document.getElementById("quizBox");
+        quizBox.innerHTML = quiz
+          .map(
+            (q, index) => `
+      <div id="question${index}">
+        <div class="question">${index + 1}. ${q.question}</div>
+        <div class="options" id="options${index}">
+          ${q.options
+            .map(
+              (opt) => `
+            <div class="option">
+              <label>
+                <input type="radio" name="question${index}" value="${opt.key}" onclick="checkAnswer(${index}, '${opt.key}', this)">
+                ${opt.text}
+              </label>
+            </div>
+          `
+            )
+            .join("")}
+        </div>
+      </div>
+    `
+          )
+          .join("");
+
+        document.getElementById("warning").textContent =
+          invalidCount > 0
+            ? `⚠️ ശ്രദ്ധിക്കുക: ${invalidCount} പിഴവുള്ള ലൈനുകൾ സ്കിപ്പ് ചെയ്തിരിക്കുന്നു.<br>Skipped Lines: ${invalidLines.join(
+                ", "
+              )}`
+            : "";
+
+        updateResult();
+      }
+
+      function checkAnswer(index, selectedValue, element) {
+        const correctAnswer = quiz[index].answer;
+        if (answered[index]) return;
+
+        if (selectedValue === correctAnswer) {
+          element.parentElement.classList.add("correct");
+        } else {
+          element.parentElement.classList.add("wrong");
+
+          const correctInput = document.querySelector(
+            `input[name="question${index}"][value="${correctAnswer}"]`
+          );
+          if (correctInput) {
+            correctInput.parentElement.classList.add("correct");
+          }
+        }
+
+        document
+          .querySelectorAll(`input[name="question${index}"]`)
+          .forEach((inp) => (inp.disabled = true));
+        answered[index] = selectedValue === correctAnswer;
+
+        updateResult();
+        scrollToNext(index);
+      }
+
+      function updateResult() {
+        const total = quiz.length;
+        const correct = Object.values(answered).filter(
+          (v) => v === true
+        ).length;
+        document.getElementById(
+          "result"
+        ).textContent = `നിങ്ങളുടെ സ്കോർ: ${correct}/${total}`;
+      }
+
+      function scrollToNext(currentIndex) {
+        const nextElement = document.getElementById(
+          `question${currentIndex + 1}`
+        );
+        if (nextElement) {
+          nextElement.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }
+
+      // Load topics when page loads
+      window.onload = loadTopics;
+    </script>
+  </body>
+</html>

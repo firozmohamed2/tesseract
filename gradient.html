@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Poster Gradient Text</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+      }
+
+      .poster {
+        width: 100vw;
+        height: 100vh;
+        /* background-image: url("intelpost.jpg");  */
+        background: #000;
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .gradient-text {
+        font-size: 4rem;
+        font-weight: bold;
+        background: linear-gradient(90deg, #eeba2b, #ffbc57, #eeba2b);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        color: transparent;
+        position: absolute;
+        cursor: move;
+        user-select: none;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        white-space: nowrap;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="poster">
+      <h1 class="gradient-text" id="draggable">
+        സ്വപ്നം സത്യമാക്കാം <br />
+        ഇന്റലിനോടൊപ്പം✨
+      </h1>
+    </div>
+
+    <script>
+      // Make the text draggable
+      const text = document.getElementById("draggable");
+      let isDragging = false;
+      let offsetX, offsetY;
+
+      text.addEventListener("mousedown", (e) => {
+        isDragging = true;
+        offsetX = e.clientX - text.offsetLeft;
+        offsetY = e.clientY - text.offsetTop;
+      });
+
+      document.addEventListener("mousemove", (e) => {
+        if (isDragging) {
+          text.style.left = `${e.clientX - offsetX}px`;
+          text.style.top = `${e.clientY - offsetY}px`;
+          text.style.transform = "none";
+        }
+      });
+
+      document.addEventListener("mouseup", () => {
+        isDragging = false;
+      });
+    </script>
+  </body>
+</html>
