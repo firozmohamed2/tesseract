@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ml">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Quiz Admin Panel</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        background: #f8f9fa;
+        margin: 0;
+        padding: 0;
+      }
+      .header {
+        position: sticky;
+        top: 0;
+        background: #007bff;
+        color: white;
+        padding: 15px;
+        font-size: 20px;
+        font-weight: bold;
+        text-align: center;
+        z-index: 1000;
+      }
+      .container {
+        padding: 20px;
+        padding-top: 80px;
+        max-width: 900px;
+        margin: auto;
+      }
+      textarea,
+      input[type="text"] {
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 10px;
+        font-size: 16px;
+      }
+      button {
+        padding: 10px 15px;
+        font-size: 16px;
+        margin-top: 10px;
+        cursor: pointer;
+      }
+      .topics {
+        margin-top: 30px;
+      }
+      .topic-button {
+        display: inline-block;
+        padding: 8px 12px;
+        margin: 5px;
+        background: #28a745;
+        color: white;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      .warning {
+        color: orange;
+        font-weight: bold;
+        margin-top: 10px;
+      }
+    </style>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  </head>
+
+  <body>
+    <div class="header">🛠️ Quiz Admin Panel</div>
+
+    <div class="container">
+      <h2>➤ Add New Quiz</h2>
+      <input
+        type="text"
+        id="topicName"
+        placeholder="Enter Topic Name (Eg: Kerala History)"
+      />
+      <textarea
+        id="rawInput"
+        placeholder="Paste your quiz data here..."
+      ></textarea>
+      <button onclick="saveQuiz()">Save Quiz to Firebase</button>
+
+      <div class="warning" id="warning"></div>
+
+      <h2>➤ Existing Topics:</h2>
+      <div id="topics" class="topics"></div>
+    </div>
+
+    <script>
+      // Initialize Firebase
+      const firebaseConfig = {
+        apiKey: "AIzaSyA88fPkOvcI4QA9qD3ROpk-ay-V6ibQQlc",
+        authDomain: "my-application-7fd40.firebaseapp.com",
+        projectId: "my-application-7fd40",
+        storageBucket: "my-application-7fd40.appspot.com",
+        messagingSenderId: "269589994279",
+        appId: "1:269589994279:web:4c617a622c328a1224e702",
+        measurementId: "G-D8MD1J28GR",
+      };
+      firebase.initializeApp(firebaseConfig);
+      const db = firebase.firestore();
+
+      let invalidCount = 0;
+      let invalidLines = [];
+
+      function shuffleArray(array) {
+        return array
+          .map((value) => ({ value, sort: Math.random() }))
+          .sort((a, b) => a.sort - b.sort)
+          .map(({ value }) => value);
+      }
+
+      function parseQuizData(raw) {
+        const lines = raw.trim().split("\n");
+        invalidCount = 0;
+        invalidLines = [];
+
+        return lines
+          .map((line) => line.trim())
+          .filter((line) => line.length > 0)
+          .map((line, idx) => {
+            const parts = line.split("\t");
+            if (parts.length < 6) {
+              invalidCount++;
+              invalidLines.push(idx + 1);
+              return null;
+            }
+            const options = [
+              { key: "a", text: parts[1] },
+              { key: "b", text: parts[2] },
+              { key: "c", text: parts[3] },
+              { key: "d", text: parts[4] },
+            ];
+            return {
+              question: parts[0],
+              options: shuffleArray(options),
+              answer: parts[5].toLowerCase().trim(),
+            };
+          })
+          .filter((q) => q !== null);
+      }
+
+      function saveQuiz() {
+        const topic = document.getElementById("topicName").value.trim();
+        const raw = document.getElementById("rawInput").value.trim();
+        if (!topic || !raw) {
+          alert("Please enter both Topic Name and Quiz Data!");
+          return;
+        }
+        const parsedQuiz = parseQuizData(raw);
+
+        db.collection("quiz")
+          .doc(topic)
+          .set({ questions: parsedQuiz })
+          .then(() => {
+            alert("✅ Quiz Saved Successfully!");
+            loadTopics();
+          })
+          .catch((err) => {
+            alert("❌ Error saving quiz: " + err.message);
+          });
+
+        document.getElementById("warning").innerHTML =
+          invalidCount > 0
+            ? `⚠️ Skipped ${invalidCount} invalid line(s). Line numbers: ${invalidLines.join(
+                ", "
+              )}`
+            : "";
+      }
+
+      function loadTopics() {
+        db.collection("quiz")
+          .get()
+          .then((snapshot) => {
+            const topicsDiv = document.getElementById("topics");
+            topicsDiv.innerHTML = "";
+            snapshot.forEach((doc) => {
+              const topicName = doc.id;
+              const btn = document.createElement("div");
+              btn.className = "topic-button";
+              btn.innerText = topicName;
+              topicsDiv.appendChild(btn);
+            });
+          });
+      }
+
+      // Load topics on page load
+      window.onload = loadTopics;
+    </script>
+  </body>
+</html>
