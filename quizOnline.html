@@ -1,154 +1,88 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ml">
   <head>
     <meta charset="UTF-8" />
-    <title>Quiz Practice</title>
+    <title>Live Quiz</title>
     <style>
       body {
-        font-family: Arial, sans-serif;
+        font-family: sans-serif;
+        background: #f8f9fa;
         margin: 0;
-        padding-top: 80px; /* space for fixed header */
-        background: #f4f4f4;
+        padding: 0;
       }
-      .fixed-header {
-        position: fixed;
+      .header {
+        position: sticky;
         top: 0;
-        left: 0;
-        right: 0;
         background: #007bff;
         color: white;
         padding: 15px;
+        font-size: 20px;
         text-align: center;
-        font-size: 24px;
-        z-index: 1000;
       }
       .container {
         padding: 20px;
+        max-width: 900px;
+        margin: auto;
       }
-      #topicsList {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        margin-bottom: 20px;
+      .topics {
+        margin: 20px 0;
       }
-      .topic-item {
-        background: white;
-        padding: 10px 15px;
-        border: 1px solid #ccc;
-        cursor: pointer;
-        border-radius: 5px;
-      }
-      .topic-item.selected {
+      .topic {
+        display: inline-block;
         background: #28a745;
         color: white;
+        padding: 10px 15px;
+        border-radius: 5px;
+        margin: 5px;
+        cursor: pointer;
       }
-      #questionsContainer {
-        margin-top: 30px;
-      }
-      .question-card {
+      .quiz-box {
         background: white;
-        margin-bottom: 20px;
-        padding: 15px;
+        padding: 20px;
         border-radius: 8px;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        margin-top: 20px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      }
+      .question {
+        font-weight: bold;
+        margin-top: 20px;
       }
       .option {
-        background: #eee;
-        margin: 5px;
-        padding: 10px;
-        border-radius: 5px;
+        margin: 5px 0;
         cursor: pointer;
-        flex: 1 1 auto; /* Allow options to grow and shrink based on available space */
-        max-width: 150px; /* Limit the maximum width of options */
-        text-align: center;
       }
-      .question-card {
-        display: flex;
-        flex-direction: column;
-        gap: 15px;
+      input[type="radio"] {
+        transform: scale(1.3);
+        margin-right: 8px;
+        cursor: pointer;
       }
-      .question-card .options-container {
-        display: flex;
-        flex-wrap: wrap; /* Allows the options to wrap into multiple lines if needed */
-        gap: 10px;
-      }
-
-      @media (max-width: 600px) {
-        .question-card .options-container {
-          flex-direction: column; /* Stack options vertically for smaller screens */
-        }
-      }
-
-      .option.correct {
-        background: #c8f7c5;
+      .correct {
         color: green;
-        animation: pop 0.4s ease;
+        font-weight: bold;
       }
-      .option.wrong {
-        background: #f7c5c5;
+      .wrong {
         color: red;
+        font-weight: bold;
       }
-      @keyframes pop {
-        0% {
-          transform: scale(1);
-        }
-        50% {
-          transform: scale(1.1);
-        }
-        100% {
-          transform: scale(1);
-        }
-      }
-      #searchBar {
-        width: 100%;
-        padding: 10px;
-        margin-bottom: 15px;
-        font-size: 16px;
-      }
-      #randomizeToggle {
-        margin-bottom: 15px;
-      }
-      .highlight-next {
-        animation: blink 0.8s ease-in-out;
-      }
-
-      @keyframes blink {
-        0% {
-          background-color: #ffeb3b;
-        }
-        50% {
-          background-color: #fff176;
-        }
-        100% {
-          background-color: white;
-        }
+      .wrong-count {
+        color: orange;
+        font-size: 14px;
+        margin-left: 10px;
       }
     </style>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
   </head>
   <body>
-    <div class="fixed-header">Score: <span id="score">0</span></div>
+    <div class="header" id="result">നിങ്ങളുടെ സ്കോർ: 0/0</div>
 
     <div class="container">
-      <input type="text" id="searchBar" placeholder="Search Topics..." />
-
-      <div id="randomizeToggle">
-        <label
-          ><input type="checkbox" id="randomizeQuestions" /> Randomize Question
-          Order</label
-        >
-      </div>
-
-      <div id="topicsList"></div>
-
-      <div id="questionsContainer"></div>
+      <div class="topics" id="topicsList"></div>
+      <div id="quizBox" class="quiz-box"></div>
     </div>
 
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
-
     <script>
-      // Initialize Firebase
       const firebaseConfig = {
         apiKey: "AIzaSyA88fPkOvcI4QA9qD3ROpk-ay-V6ibQQlc",
         authDomain: "my-application-7fd40.firebaseapp.com",
@@ -161,158 +95,126 @@
       firebase.initializeApp(firebaseConfig);
       const db = firebase.firestore();
 
-      const topicsList = document.getElementById("topicsList");
-      const questionsContainer = document.getElementById("questionsContainer");
-      const scoreSpan = document.getElementById("score");
-      const searchBar = document.getElementById("searchBar");
-      const randomizeCheckbox = document.getElementById("randomizeQuestions");
-
-      let allTopics = [];
-      let selectedTopics = new Set();
-      let currentQuestions = [];
-      let score = 0;
+      let quiz = [];
+      let answered = {};
+      let currentTopic = "";
+      let wrongClicks = {};
 
       function loadTopics() {
-        db.collection("quiz")
+        db.collection("quizi")
           .get()
           .then((snapshot) => {
-            allTopics = snapshot.docs.map((doc) => ({
-              id: doc.id,
-              data: doc.data(),
-            }));
-            showTopics(allTopics);
+            const topicsDiv = document.getElementById("topicsList");
+            topicsDiv.innerHTML = "";
+            snapshot.forEach((doc) => {
+              const topic = doc.id;
+              const btn = document.createElement("div");
+              btn.className = "topic";
+              btn.innerText = topic;
+              btn.onclick = () => loadQuiz(topic);
+              topicsDiv.appendChild(btn);
+            });
           });
       }
 
-      function showTopics(topics) {
-        topicsList.innerHTML = "";
-        topics.forEach((topic) => {
-          const div = document.createElement("div");
-          div.className = "topic-item";
-          div.textContent = topic.id;
-          div.onclick = () => toggleTopic(topic.id);
-          topicsList.appendChild(div);
-        });
-      }
-
-      function toggleTopic(topicId) {
-        if (selectedTopics.has(topicId)) {
-          selectedTopics.delete(topicId);
-        } else {
-          selectedTopics.add(topicId);
-        }
-        updateTopicSelection();
-        loadQuestions();
-      }
-
-      function updateTopicSelection() {
-        document.querySelectorAll(".topic-item").forEach((item) => {
-          if (selectedTopics.has(item.textContent)) {
-            item.classList.add("selected");
-          } else {
-            item.classList.remove("selected");
-          }
-        });
-      }
-
-      function loadQuestions() {
-        if (selectedTopics.size === 0) {
-          questionsContainer.innerHTML = "<p>Select at least one topic</p>";
-          return;
-        }
-
-        currentQuestions = [];
-        const promises = Array.from(selectedTopics).map((topicId) =>
-          db.collection("quiz").doc(topicId).get()
-        );
-
-        Promise.all(promises).then((docs) => {
-          docs.forEach((doc) => {
+      function loadQuiz(topic) {
+        currentTopic = topic;
+        db.collection("quizi")
+          .doc(topic)
+          .get()
+          .then((doc) => {
             if (doc.exists) {
-              const questions = doc.data().questions || [];
-              currentQuestions.push(...questions);
+              quiz = doc.data().questions;
+              answered = {};
+              loadWrongClicks(topic);
             }
           });
-
-          if (randomizeCheckbox.checked) {
-            shuffleArray(currentQuestions);
-          }
-
-          renderQuestions();
-        });
       }
 
-      function renderQuestions() {
-        questionsContainer.innerHTML = ""; // Clear previous content
-
-        currentQuestions.forEach((q, idx) => {
-          const card = document.createElement("div");
-          card.className = "question-card";
-          card.id = "question-" + idx;
-
-          const qText = document.createElement("h3");
-          qText.textContent = idx + 1 + ". " + q.question;
-          card.appendChild(qText);
-
-          const optionsContainer = document.createElement("div");
-          optionsContainer.className = "options-container";
-
-          q.options.forEach((opt) => {
-            const optDiv = document.createElement("div");
-            optDiv.className = "option";
-            optDiv.textContent = opt.text;
-            optDiv.onclick = () => handleAnswer(optDiv, opt.key, q.answer, idx);
-            optionsContainer.appendChild(optDiv);
+      function loadWrongClicks(topic) {
+        db.collection("wrongAnswers")
+          .doc(topic)
+          .get()
+          .then((doc) => {
+            wrongClicks = doc.exists ? doc.data() : {};
+            displayQuiz();
           });
-
-          card.appendChild(optionsContainer);
-          questionsContainer.appendChild(card);
-        });
       }
-      function handleAnswer(optionDiv, selected, correct, idx) {
-        const options = optionDiv.parentElement.querySelectorAll(".option");
-        options.forEach((opt) => (opt.style.pointerEvents = "none")); // disable further clicking
 
-        if (selected.trim() === correct.trim()) {
-          optionDiv.classList.add("correct");
-          score++;
-          scoreSpan.textContent = score;
+      function displayQuiz() {
+        const quizBox = document.getElementById("quizBox");
+        quizBox.innerHTML = quiz
+          .map(
+            (q, idx) => `
+      <div id="question${idx}">
+        <div class="question">${idx + 1}. ${q.question} 
+          <span class="wrong-count">(Wrong: ${wrongClicks[q.id] || 0})</span>
+        </div>
+        <div class="options" id="options${idx}">
+          ${q.options
+            .map(
+              (opt) => `
+            <div class="option">
+              <label>
+                <input type="radio" name="question${idx}" value="${opt.key}" onclick="checkAnswer(${idx}, '${opt.key}', this)">
+                ${opt.text}
+              </label>
+            </div>
+          `
+            )
+            .join("")}
+        </div>
+      </div>
+    `
+          )
+          .join("");
+        updateResult();
+      }
+
+      function checkAnswer(index, selected, element) {
+        const correct = quiz[index].answer;
+        const qid = quiz[index].id;
+        if (answered[index]) return;
+
+        if (selected === correct) {
+          element.parentElement.classList.add("correct");
         } else {
-          optionDiv.classList.add("wrong");
-          options.forEach((opt) => {
-            if (opt.textContent.trim() === correct.trim()) {
-              opt.classList.add("correct");
-            }
-          });
-        }
-        // Highlight next question
-        setTimeout(() => {
-          const nextCard = document.getElementById("question-" + (idx + 1));
-          if (nextCard) {
-            nextCard.classList.add("highlight-next");
-            setTimeout(() => {
-              nextCard.classList.remove("highlight-next");
-            }, 800); // highlight stays for 800ms
+          element.parentElement.classList.add("wrong");
+          const correctInput = document.querySelector(
+            `input[name="question${index}"][value="${correct}"]`
+          );
+          if (correctInput) {
+            correctInput.parentElement.classList.add("correct");
           }
-        }, 300); // slight delay after answering
-      }
-
-      function shuffleArray(arr) {
-        for (let i = arr.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [arr[i], arr[j]] = [arr[j], arr[i]];
+          incrementWrongCount(qid);
         }
+
+        document
+          .querySelectorAll(`input[name="question${index}"]`)
+          .forEach((inp) => (inp.disabled = true));
+        answered[index] = selected === correct;
+        updateResult();
       }
 
-      searchBar.addEventListener("input", () => {
-        const keyword = searchBar.value.toLowerCase();
-        const filtered = allTopics.filter((topic) =>
-          topic.id.toLowerCase().includes(keyword)
-        );
-        showTopics(filtered);
-      });
+      function updateResult() {
+        const total = quiz.length;
+        const correct = Object.values(answered).filter((v) => v).length;
+        document.getElementById(
+          "result"
+        ).textContent = `നിങ്ങളുടെ സ്കോർ: ${correct}/${total}`;
+      }
 
-      loadTopics();
+      function incrementWrongCount(questionId) {
+        const ref = db.collection("wrongAnswers").doc(currentTopic);
+        ref.set(
+          {
+            [questionId]: firebase.firestore.FieldValue.increment(1),
+          },
+          { merge: true }
+        );
+      }
+
+      window.onload = loadTopics;
     </script>
   </body>
 </html>
