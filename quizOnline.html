@@ -120,6 +120,23 @@
       >
         ചോദ്യങ്ങൾ ക്രമരഹിതമാക്കുക
       </button>
+      <button
+        class="shuffle-btn"
+        onclick="showUnattempted()"
+        style="display: none"
+        id="unattemptedBtn"
+      >
+        Unattempted Only
+      </button>
+      <button
+        class="shuffle-btn"
+        onclick="showAttempted()"
+        style="display: none"
+        id="attemptedBtn"
+      >
+        Attempted Only
+      </button>
+
       <div id="quizBox" class="quiz-box"></div>
     </div>
 
@@ -169,6 +186,10 @@
       function loadQuiz(topic) {
         currentTopic = topic;
         document.getElementById("shuffleBtn").style.display = "inline-block";
+        document.getElementById("unattemptedBtn").style.display =
+          "inline-block";
+        document.getElementById("attemptedBtn").style.display = "inline-block";
+
         db.collection("quizi")
           .doc(topic)
           .get()
@@ -176,8 +197,9 @@
             if (doc.exists) {
               quiz = doc.data().questions;
               answered = {};
-              shuffleNow = false; // Reset shuffle
+              shuffleNow = false;
               loadWrongClicks(topic);
+              loadAttempted(topic); // NEW
             }
           });
       }
@@ -253,8 +275,24 @@
         document
           .querySelectorAll(`input[name="question${index}"]`)
           .forEach((inp) => (inp.disabled = true));
+
         answered[index] = selected === correct;
+
+        // ADD THIS:
+        markAttempted(qid);
+
         updateResult();
+      }
+
+      // New function to mark question as attempted:
+      function markAttempted(questionId) {
+        const ref = db.collection("attemptedQuestions").doc(currentTopic);
+        ref.set(
+          {
+            [questionId]: true,
+          },
+          { merge: true }
+        );
       }
 
       function updateResult() {
@@ -278,6 +316,58 @@
       function shuffleQuestions() {
         shuffleNow = true;
         displayQuiz();
+      }
+
+      let attempted = {}; // store attempted questions
+
+      function loadAttempted(topic) {
+        db.collection("attemptedQuestions")
+          .doc(topic)
+          .get()
+          .then((doc) => {
+            attempted = doc.exists ? doc.data() : {};
+          });
+      }
+
+      //custom quiz
+      function showUnattempted() {
+        const unattemptedQuiz = quiz.filter((q) => !attempted[q.id]);
+        displayCustomQuiz(unattemptedQuiz);
+      }
+
+      function showAttempted() {
+        const attemptedQuiz = quiz.filter((q) => attempted[q.id]);
+        displayCustomQuiz(attemptedQuiz);
+      }
+
+      function displayCustomQuiz(customQuiz) {
+        const quizBox = document.getElementById("quizBox");
+        quizBox.innerHTML = customQuiz
+          .map((q, idx) => {
+            const options = [...q.options];
+            shuffleArray(options);
+
+            return `
+      <div class="qblock" id="question${idx}">
+        <div class="question">${idx + 1}. ${q.question} 
+          <span class="wrong-count">(Wrong: ${wrongClicks[q.id] || 0})</span>
+        </div>
+        <div class="options" id="options${idx}">
+          ${options
+            .map(
+              (opt) => `
+              <div class="option" onclick="document.getElementById('radio${idx}${opt.key}').click();">
+                <input type="radio" id="radio${idx}${opt.key}" name="question${idx}" value="${opt.key}" onclick="checkAnswer(${idx}, '${opt.key}', this)" style="pointer-events: none;">
+                <label for="radio${idx}${opt.key}" style="margin:0;">${opt.text}</label>
+              </div>
+            `
+            )
+            .join("")}
+        </div>
+      </div>
+    `;
+          })
+          .join("");
       }
 
       window.onload = loadTopics;
