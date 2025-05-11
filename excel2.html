@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ml">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Malayalam Question Parser</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        padding: 20px;
+        max-width: 1000px;
+        margin: auto;
+      }
+      textarea {
+        width: 100%;
+        height: 200px;
+        font-size: 16px;
+      }
+      button {
+        margin-top: 10px;
+        padding: 10px 15px;
+        font-size: 16px;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        margin-top: 20px;
+      }
+      th,
+      td {
+        border: 1px solid #ccc;
+        padding: 10px;
+        vertical-align: top;
+      }
+      th {
+        background-color: #f2f2f2;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Malayalam Question Parser to Table</h2>
+    <textarea
+      id="inputText"
+      placeholder="Paste your questions here..."
+    ></textarea>
+    <br />
+    <button onclick="parseQuestions()">Parse</button>
+    <button onclick="downloadCSV()">Download as CSV</button>
+    <div id="output"></div>
+
+    <script>
+      function parseQuestions() {
+        const input = document.getElementById("inputText").value.trim();
+        const lines = input.split(/\n/).filter(Boolean);
+
+        let html =
+          "<table><tr><th>Question</th><th>A</th><th>B</th><th>C</th><th>D</th><th>Answer</th><th>Explanation</th></tr>";
+
+        for (let line of lines) {
+          const match = line.match(
+            /^Question\s*\d+:\s*(.*?)\s+A\)\s*(.*?)\s+B\)\s*(.*?)\s+C\)\s*(.*?)\s+D\)\s*(.*?)\s+Answer:\s*(.*?)\s+Explanation:\s*(.*)$/s
+          );
+
+          if (match) {
+            const [, question, a, b, c, d, answer, explanation] = match;
+            html += `<tr>
+        <td>${question.trim()}</td>
+        <td>${a.trim()}</td>
+        <td>${b.trim()}</td>
+        <td>${c.trim()}</td>
+        <td>${d.trim()}</td>
+        <td>${answer.trim()}</td>
+        <td>${explanation.trim()}</td>
+      </tr>`;
+          }
+        }
+
+        html += "</table>";
+        document.getElementById("output").innerHTML = html;
+      }
+
+      function downloadCSV() {
+        const rows = [["Question", "A", "B", "C", "D"]];
+        const table = document.querySelector("table");
+        if (!table) return alert("No table to export!");
+
+        for (let tr of table.querySelectorAll("tr:nth-child(n+2)")) {
+          const cells = Array.from(tr.querySelectorAll("td")).map(
+            (td) => `"${td.textContent.trim()}"`
+          );
+          rows.push(cells);
+        }
+
+        const csvContent = rows.map((r) => r.join(",")).join("\n");
+        const blob = new Blob([csvContent], {
+          type: "text/csv;charset=utf-8;",
+        });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "questions.csv";
+        link.click();
+      }
+    </script>
+  </body>
+</html>
